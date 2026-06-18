@@ -1,0 +1,406 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Auth ────────────────────────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  role          UserRole  @default(DEVELOPER)
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts          Account[]
+  sessions          Session[]
+  ownedProjects     Project[]       @relation("ProjectOwner")
+  projectMembers    ProjectMember[]
+  assignedTickets   Ticket[]        @relation("TicketAssignee")
+  reportedTickets   Ticket[]        @relation("TicketReporter")
+  comments          Comment[]
+  dailyEntries      DailyEntry[]
+  notifications     Notification[]
+  watchedTickets    TicketWatcher[]
+  activityLogs      ActivityLog[]
+}
+
+enum UserRole {
+  ADMIN
+  PROJECT_MANAGER
+  DEVELOPER
+  DESIGNER
+  VIEWER
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─── Projects ────────────────────────────────────────────────────────────────
+
+model Project {
+  id          String        @id @default(cuid())
+  name        String
+  description String?       @db.Text
+  status      ProjectStatus @default(PLANNING)
+  priority    Priority      @default(MEDIUM)
+  progress    Int           @default(0)
+  startDate   DateTime?
+  dueDate     DateTime?
+  ownerId     String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  owner         User            @relation("ProjectOwner", fields: [ownerId], references: [id])
+  members       ProjectMember[]
+  tickets       Ticket[]
+  phases        Phase[]
+  sprints       Sprint[]
+  workflowSteps WorkflowStep[]
+
+  @@index([ownerId])
+  @@index([status])
+}
+
+model WorkflowStep {
+  id        String   @id @default(cuid())
+  projectId String
+  name      String
+  order     Int      @default(0)
+  done      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  project  Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  subSteps WorkflowSubStep[]
+}
+
+model WorkflowSubStep {
+  id     String  @id @default(cuid())
+  stepId String
+  name   String
+  order  Int     @default(0)
+  done   Boolean @default(false)
+
+  step WorkflowStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+}
+
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  ON_HOLD
+  DONE
+  DELAYED
+  AT_RISK
+}
+
+model ProjectMember {
+  id        String   @id @default(cuid())
+  projectId String
+  userId    String
+  role      UserRole @default(DEVELOPER)
+  joinedAt  DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([userId])
+}
+
+model Phase {
+  id        String      @id @default(cuid())
+  projectId String
+  name      String
+  order     Int
+  status    PhaseStatus @default(PENDING)
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+enum PhaseStatus {
+  PENDING
+  ACTIVE
+  DONE
+}
+
+// ─── Sprints ─────────────────────────────────────────────────────────────────
+
+model Sprint {
+  id        String       @id @default(cuid())
+  name      String
+  projectId String
+  startDate DateTime
+  endDate   DateTime
+  status    SprintStatus @default(PLANNED)
+  goal      String?      @db.Text
+  createdAt DateTime     @default(now())
+
+  project Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  items   SprintItem[]
+}
+
+enum SprintStatus {
+  PLANNED
+  ACTIVE
+  COMPLETED
+}
+
+model SprintItem {
+  id       String @id @default(cuid())
+  sprintId String
+  ticketId String
+
+  sprint Sprint @relation(fields: [sprintId], references: [id], onDelete: Cascade)
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@unique([sprintId, ticketId])
+}
+
+// ─── Tickets ─────────────────────────────────────────────────────────────────
+
+model Ticket {
+  id          String       @id @default(cuid())
+  ticketKey   String       @unique // e.g. PAY-42
+  title       String
+  description String?      @db.Text
+  type        TicketType   @default(TASK)
+  status      TicketStatus @default(OPEN)
+  priority    Priority     @default(MEDIUM)
+  projectId   String
+  assigneeId  String?
+  reporterId  String
+  dueDate     DateTime?
+  labels      String[]     @default([])
+  order       Int          @default(0)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  project      Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignee     User?           @relation("TicketAssignee", fields: [assigneeId], references: [id])
+  reporter     User            @relation("TicketReporter", fields: [reporterId], references: [id])
+  comments     Comment[]
+  attachments  Attachment[]
+  linkedFrom   TicketLink[]    @relation("LinkSource")
+  linkedTo     TicketLink[]    @relation("LinkTarget")
+  watchers     TicketWatcher[]
+  sprintItems  SprintItem[]
+  activityLogs ActivityLog[]
+
+  @@index([assigneeId])
+  @@index([projectId])
+  @@index([assigneeId, status])
+  @@index([projectId, status])
+  @@index([updatedAt(sort: Desc)])
+}
+
+enum TicketType {
+  BUG
+  FEATURE
+  TASK
+  IMPROVEMENT
+  QUESTION
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  IN_REVIEW
+  DONE
+  CANCELLED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model TicketLink {
+  id       String   @id @default(cuid())
+  sourceId String
+  targetId String
+  linkType LinkType
+
+  source Ticket @relation("LinkSource", fields: [sourceId], references: [id], onDelete: Cascade)
+  target Ticket @relation("LinkTarget", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceId, targetId])
+}
+
+enum LinkType {
+  BLOCKS
+  BLOCKED_BY
+  RELATES_TO
+  DUPLICATES
+}
+
+model TicketWatcher {
+  id       String @id @default(cuid())
+  ticketId String
+  userId   String
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([ticketId, userId])
+}
+
+// ─── Comments ────────────────────────────────────────────────────────────────
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String   @db.Text
+  ticketId  String
+  authorId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author User   @relation(fields: [authorId], references: [id])
+
+  @@index([ticketId])
+}
+
+// ─── Attachments ─────────────────────────────────────────────────────────────
+
+model Attachment {
+  id        String   @id @default(cuid())
+  name      String
+  url       String
+  size      Int
+  mimeType  String
+  ticketId  String
+  uploadedById String
+  createdAt DateTime @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+}
+
+// ─── Daily Tracker ───────────────────────────────────────────────────────────
+
+model DailyEntry {
+  id        String      @id @default(cuid())
+  userId    String
+  date      DateTime    @db.Date
+  notes     String?     @db.Text
+  blockers  String?     @db.Text
+  mood      Int?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  user  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks DailyTask[]
+
+  @@unique([userId, date])
+}
+
+model DailyTask {
+  id          String     @id @default(cuid())
+  entryId     String
+  description String
+  projectId   String?
+  projectName String?
+  hours       Float      @default(0)
+  status      TaskStatus @default(IN_PROGRESS)
+  order       Int        @default(0)
+
+  entry DailyEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@index([entryId])
+}
+
+enum TaskStatus {
+  IN_PROGRESS
+  DONE
+  BLOCKED
+}
+
+// ─── Notifications ───────────────────────────────────────────────────────────
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  link      String?
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([createdAt(sort: Desc)])
+}
+
+enum NotificationType {
+  TICKET_ASSIGNED
+  TICKET_COMMENT
+  TICKET_STATUS_CHANGED
+  TICKET_MENTIONED
+  TICKET_DUE_SOON
+  PROJECT_MILESTONE
+  PROJECT_MEMBER_ADDED
+}
+
+// ─── Activity Log ────────────────────────────────────────────────────────────
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  ticketId  String
+  userId    String
+  action    String
+  field     String?
+  oldValue  String?
+  newValue  String?
+  createdAt DateTime @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@index([ticketId])
+  @@index([createdAt(sort: Desc)])
+}
