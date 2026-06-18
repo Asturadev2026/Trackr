@@ -34,7 +34,7 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
   const session = await getSession()
   const userId = session!.user.id
 
-  const [project, ticketGroups, allTickets, platformUsers] = await Promise.all([
+  const [project, ticketGroups, allTickets, platformUsers, projectDocs] = await Promise.all([
     getProject(params.id),
     prisma.ticket.groupBy({
       by: ["status"],
@@ -57,6 +57,12 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
       select: { id: true, name: true, image: true, email: true, role: true },
       orderBy: { name: "asc" },
     }),
+    // All attachments for this project: direct uploads + via tickets
+    prisma.attachment.findMany({
+      where: { OR: [{ projectId: params.id }, { ticket: { projectId: params.id } }] },
+      include: { ticket: { select: { ticketKey: true } } },
+      orderBy: { createdAt: "desc" },
+    }),
   ])
 
   if (!project) notFound()
@@ -69,6 +75,16 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
     inProgress: statsMap.get("IN_PROGRESS") ?? 0,
   }
 
+  const docs = projectDocs.map((a) => ({
+    id: a.id,
+    name: a.name,
+    url: a.url,
+    size: a.size,
+    mimeType: a.mimeType,
+    createdAt: a.createdAt.toISOString(),
+    ticketKey: a.ticket?.ticketKey ?? null,
+  }))
+
   return (
     <ProjectDetailClient
       project={project}
@@ -77,6 +93,7 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
       allTickets={allTickets}
       platformUsers={platformUsers}
       userId={userId}
+      initialDocs={docs}
     />
   )
 }

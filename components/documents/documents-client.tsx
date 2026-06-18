@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { useSession } from "next-auth/react"
 import { format } from "date-fns"
 import { Search, Plus, FileText, Table2, File, Trash2, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -76,6 +77,8 @@ interface Props {
 
 export function DocumentsClient({ docs: initialDocs, projects }: Props) {
   const router = useRouter()
+  const { data: session } = useSession()
+  const isIntern = session?.user?.role === "INTERN"
   const [docs, setDocs] = useState(initialDocs)
   const [search, setSearch] = useState("")
   const [typeFilter, setTypeFilter] = useState<FileType>("all")
@@ -198,7 +201,7 @@ export function DocumentsClient({ docs: initialDocs, projects }: Props) {
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map((doc) => (
-              <DocumentCard key={doc.id} doc={doc} onDelete={handleDelete} />
+              <DocumentCard key={doc.id} doc={doc} onDelete={handleDelete} canDelete={!isIntern} />
             ))}
           </div>
         )}
@@ -214,18 +217,39 @@ export function DocumentsClient({ docs: initialDocs, projects }: Props) {
   )
 }
 
-function DocumentCard({ doc, onDelete }: { doc: Doc; onDelete: (doc: Doc) => void }) {
+function DocumentCard({ doc, onDelete, canDelete }: { doc: Doc; onDelete: (doc: Doc) => void; canDelete: boolean }) {
   const fileType = getFileType(doc.mimeType, doc.name)
   const config = FILE_TYPE_CONFIG[fileType]
 
   return (
-    <div className="group relative rounded-xl border bg-card p-4 hover:shadow-md transition-all">
-      <div className="flex items-start justify-between mb-4">
-        {/* File icon */}
-        <div className={cn("h-11 w-11 rounded-xl flex items-center justify-center", config.bg)}>
-          {config.icon}
+    <div className="group relative rounded-xl border bg-card hover:shadow-md transition-all overflow-hidden">
+      {/* Entire card opens the file in a new browser tab via preview route */}
+      <a href={`/api/preview/${doc.id}`} target="_blank" rel="noopener noreferrer" className="block p-4">
+        <div className="mb-4">
+          <div className={cn("h-11 w-11 rounded-xl flex items-center justify-center", config.bg)}>
+            {config.icon}
+          </div>
         </div>
-        {/* Actions menu */}
+        <p className="font-semibold text-sm leading-snug line-clamp-2 mb-1 pr-6">{doc.name}</p>
+        <p className="text-xs text-muted-foreground mb-3">
+          {formatSize(doc.size)} · {format(new Date(doc.createdAt), "MMM d")}
+        </p>
+        <div className="flex flex-wrap gap-1.5">
+          {doc.projectName && (
+            <span className="inline-flex items-center rounded-md border bg-muted/40 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+              {doc.projectName}
+            </span>
+          )}
+          {doc.ticketKey && (
+            <span className="inline-flex items-center rounded-md border bg-muted/40 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+              {doc.ticketKey}
+            </span>
+          )}
+        </div>
+      </a>
+
+      {/* Actions menu — absolute so it doesn't nest inside the <a> */}
+      <div className="absolute top-3 right-3" onClick={(e) => e.preventDefault()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -233,54 +257,24 @@ function DocumentCard({ doc, onDelete }: { doc: Doc; onDelete: (doc: Doc) => voi
               size="icon"
               className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
             >
-              <span className="text-muted-foreground text-xs">···</span>
+              <span className="text-muted-foreground font-bold tracking-widest text-xs">···</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem asChild>
-              <a href={doc.url} target="_blank" rel="noopener noreferrer" download={doc.name}>
+              <a href={doc.url} download={doc.name}>
                 <Download className="h-3.5 w-3.5 mr-2" />
                 Download
               </a>
             </DropdownMenuItem>
-            <DropdownMenuItem
-              className="text-destructive"
-              onClick={() => onDelete(doc)}
-            >
-              <Trash2 className="h-3.5 w-3.5 mr-2" />
-              Delete
-            </DropdownMenuItem>
+            {canDelete && (
+              <DropdownMenuItem className="text-destructive" onClick={() => onDelete(doc)}>
+                <Trash2 className="h-3.5 w-3.5 mr-2" />
+                Delete
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
-      </div>
-
-      {/* File name */}
-      <a
-        href={doc.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="block font-semibold text-sm leading-snug hover:underline line-clamp-2 mb-1"
-      >
-        {doc.name}
-      </a>
-
-      {/* Meta */}
-      <p className="text-xs text-muted-foreground mb-3">
-        {formatSize(doc.size)} · {format(new Date(doc.createdAt), "MMM d")}
-      </p>
-
-      {/* Tags */}
-      <div className="flex flex-wrap gap-1.5">
-        {doc.projectName && (
-          <span className="inline-flex items-center rounded-md border bg-muted/40 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-            {doc.projectName}
-          </span>
-        )}
-        {doc.ticketKey && (
-          <span className="inline-flex items-center rounded-md border bg-muted/40 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-            {doc.ticketKey}
-          </span>
-        )}
       </div>
     </div>
   )

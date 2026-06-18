@@ -3,6 +3,7 @@
 import { useState, useRef } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { useSession } from "next-auth/react"
 import { toast } from "sonner"
 import {
   Settings,
@@ -16,6 +17,11 @@ import {
   Loader2,
   UserPlus,
   UserMinus,
+  UploadCloud,
+  FileText,
+  Table2,
+  File,
+  ExternalLink,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -76,6 +82,16 @@ interface PlatformUser {
   role: string
 }
 
+interface ProjectDoc {
+  id: string
+  name: string
+  url: string
+  size: number
+  mimeType: string
+  createdAt: string
+  ticketKey: string | null
+}
+
 interface Props {
   project: any
   stats: { total: number; done: number; open: number; inProgress: number }
@@ -83,17 +99,74 @@ interface Props {
   allTickets: TicketWithRelations[]
   platformUsers: PlatformUser[]
   userId: string
+  initialDocs: ProjectDoc[]
 }
 
-export function ProjectDetailClient({ project, stats, recentTickets, allTickets, platformUsers, userId }: Props) {
+function getDocFileType(mimeType: string, name: string) {
+  const m = mimeType.toLowerCase(), n = name.toLowerCase()
+  if (m === "application/pdf" || n.endsWith(".pdf"))
+    return { icon: <FileText className="h-4 w-4 text-red-500" />, bg: "bg-red-50" }
+  if (m.includes("wordprocessingml") || m === "application/msword" || n.match(/\.docx?$/))
+    return { icon: <FileText className="h-4 w-4 text-blue-500" />, bg: "bg-blue-50" }
+  if (m.includes("spreadsheetml") || m === "application/vnd.ms-excel" || n.match(/\.xlsx?$/) || n.endsWith(".csv"))
+    return { icon: <Table2 className="h-4 w-4 text-green-500" />, bg: "bg-green-50" }
+  return { icon: <File className="h-4 w-4 text-slate-500" />, bg: "bg-slate-100" }
+}
+
+function fmtSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+export function ProjectDetailClient({ project, stats, recentTickets, allTickets, platformUsers, userId, initialDocs }: Props) {
   const [activeTab, setActiveTab] = useState("overview")
   const router = useRouter()
+  const { data: session } = useSession()
+  const isIntern = session?.user?.role === "INTERN"
+
+  // ── Documents state ───────────────────────────────────────────────────────
+  const [docs, setDocs] = useState<ProjectDoc[]>(initialDocs)
+  const [uploading, setUploading] = useState(false)
+  const docInputRef = useRef<HTMLInputElement>(null)
+
+  async function handleDocUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ""
+    setUploading(true)
+    try {
+      const fd = new FormData()
+      fd.append("file", file)
+      fd.append("projectId", project.id)
+      const res = await fetch("/api/upload", { method: "POST", body: fd })
+      if (!res.ok) throw new Error()
+      const att = await res.json()
+      setDocs((prev) => [{ id: att.id, name: att.name, url: att.url, size: att.size, mimeType: att.mimeType, createdAt: att.createdAt, ticketKey: null }, ...prev])
+      toast.success(`"${file.name}" uploaded`)
+    } catch {
+      toast.error("Upload failed")
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  async function handleDocDelete(docId: string, docName: string) {
+    if (!confirm(`Delete "${docName}"?`)) return
+    try {
+      const res = await fetch(`/api/documents?id=${docId}`, { method: "DELETE" })
+      if (!res.ok) throw new Error()
+      setDocs((prev) => prev.filter((d) => d.id !== docId))
+      toast.success("Document deleted")
+    } catch {
+      toast.error("Failed to delete")
+    }
+  }
 
   // ── Team / member state ───────────────────────────────────────────────────
   const [members, setMembers] = useState<any[]>(project.members ?? [])
   const [showAddMember, setShowAddMember] = useState(false)
   const [selectedUserId, setSelectedUserId] = useState("")
-  const [selectedRole, setSelectedRole] = useState("AI_ENGINEER")
   const [addingMember, setAddingMember] = useState(false)
 
   const memberIds = new Set(members.map((m: any) => m.userId))
@@ -102,17 +175,16 @@ export function ProjectDetailClient({ project, stats, recentTickets, allTickets,
   const addMember = async () => {
     if (!selectedUserId) return
     setAddingMember(true)
+    const user = platformUsers.find((u) => u.id === selectedUserId)!
     try {
       const res = await fetch(`/api/projects/${project.id}/members`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: selectedUserId, role: selectedRole }),
+        body: JSON.stringify({ userId: selectedUserId, role: user.role }),
       })
       if (!res.ok) throw new Error()
-      const user = platformUsers.find((u) => u.id === selectedUserId)!
-      setMembers((prev) => [...prev, { userId: selectedUserId, role: selectedRole, user }])
+      setMembers((prev) => [...prev, { userId: selectedUserId, role: user.role, user }])
       setSelectedUserId("")
-      setSelectedRole("AI_ENGINEER")
       setShowAddMember(false)
       toast.success(`${user.name} added to project`)
     } catch {
@@ -816,23 +888,11 @@ export function ProjectDetailClient({ project, stats, recentTickets, allTickets,
                                   <div className="flex items-center gap-2">
                                     <UserAvatar user={u} size="xs" />
                                     <span>{u.name}</span>
-                                    <span className="text-xs text-muted-foreground">· {u.email}</span>
+                                    <span className="text-xs text-muted-foreground">· {u.role.toLowerCase().replace("_", " ")}</span>
                                   </div>
                                 </SelectItem>
                               ))
                             )}
-                          </SelectContent>
-                        </Select>
-                        <Select value={selectedRole} onValueChange={setSelectedRole}>
-                          <SelectTrigger className="h-8 text-sm">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="MANAGER">Manager</SelectItem>
-                            <SelectItem value="SENIOR_ENGINEER">Senior Engineer</SelectItem>
-                            <SelectItem value="AI_ENGINEER">AI Engineer</SelectItem>
-                            <SelectItem value="BUSINESS">Business</SelectItem>
-                            <SelectItem value="INTERN">Intern</SelectItem>
                           </SelectContent>
                         </Select>
                         <div className="flex gap-2">
@@ -855,6 +915,86 @@ export function ProjectDetailClient({ project, stats, recentTickets, allTickets,
                           </Button>
                         </div>
                       </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* ── Documents card ───────────────────────────────────── */}
+                <Card className="shadow-none">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-semibold">
+                        Documents
+                        {docs.length > 0 && (
+                          <span className="ml-1.5 text-xs font-normal text-muted-foreground">{docs.length}</span>
+                        )}
+                      </CardTitle>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 gap-1 text-xs"
+                        onClick={() => docInputRef.current?.click()}
+                        disabled={uploading}
+                      >
+                        {uploading
+                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          : <UploadCloud className="h-3.5 w-3.5" />}
+                        Upload
+                      </Button>
+                      <input
+                        ref={docInputRef}
+                        type="file"
+                        className="hidden"
+                        accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,.txt,.zip,.png,.jpg,.jpeg"
+                        onChange={handleDocUpload}
+                      />
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-1 pb-3">
+                    {docs.length === 0 ? (
+                      <p className="text-xs text-muted-foreground py-2 text-center">No documents yet</p>
+                    ) : (
+                      <>
+                        {docs.slice(0, 8).map((doc) => {
+                          const { icon, bg } = getDocFileType(doc.mimeType, doc.name)
+                          return (
+                            <div key={doc.id} className="flex items-center gap-2 group rounded-md px-1 py-1.5 hover:bg-muted/40 transition-colors">
+                              <div className={cn("h-7 w-7 rounded-md flex items-center justify-center shrink-0", bg)}>
+                                {icon}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium truncate leading-snug">{doc.name}</p>
+                                <p className="text-[10px] text-muted-foreground leading-snug">
+                                  {fmtSize(doc.size)}
+                                  {doc.ticketKey && <> · <span className="font-medium">{doc.ticketKey}</span></>}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <a href={`/api/preview/${doc.id}`} target="_blank" rel="noopener noreferrer">
+                                  <Button variant="ghost" size="icon" className="h-6 w-6">
+                                    <ExternalLink className="h-3 w-3" />
+                                  </Button>
+                                </a>
+                                {!isIntern && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 hover:text-destructive"
+                                    onClick={() => handleDocDelete(doc.id, doc.name)}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })}
+                        {docs.length > 8 && (
+                          <p className="text-xs text-muted-foreground text-center pt-1">
+                            +{docs.length - 8} more · <a href="/documents" className="underline hover:text-foreground">View all</a>
+                          </p>
+                        )}
+                      </>
                     )}
                   </CardContent>
                 </Card>
