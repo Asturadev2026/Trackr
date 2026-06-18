@@ -19,39 +19,49 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const session = await auth()
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const body = await req.json()
-  const parsed = updateSchema.safeParse(body)
-  if (!parsed.success) return NextResponse.json({ error: "Invalid data" }, { status: 400 })
+  try {
+    const body = await req.json()
+    const parsed = updateSchema.safeParse(body)
+    if (!parsed.success) return NextResponse.json({ error: "Invalid data" }, { status: 400 })
 
-  const data: Record<string, unknown> = { ...parsed.data }
-  if (parsed.data.startDate) data.startDate = new Date(parsed.data.startDate)
-  if (parsed.data.endDate) data.endDate = new Date(parsed.data.endDate)
+    const data: Record<string, unknown> = { ...parsed.data }
+    if (parsed.data.startDate) data.startDate = new Date(parsed.data.startDate)
+    if (parsed.data.endDate) data.endDate = new Date(parsed.data.endDate)
 
-  const sprint = await prisma.sprint.update({
-    where: { id: params.id },
-    data,
-    include: {
-      project: { select: { id: true, name: true } },
-      items: {
-        include: {
-          ticket: {
-            select: {
-              id: true, ticketKey: true, title: true, status: true, priority: true, type: true,
-              assignee: { select: { id: true, name: true, image: true } },
+    const sprint = await prisma.sprint.update({
+      where: { id: params.id },
+      data,
+      include: {
+        project: { select: { id: true, name: true } },
+        items: {
+          include: {
+            ticket: {
+              select: {
+                id: true, ticketKey: true, title: true, status: true, priority: true, type: true,
+                assignee: { select: { id: true, name: true, image: true } },
+              },
             },
           },
         },
       },
-    },
-  })
+    })
 
-  return NextResponse.json(sprint)
+    return NextResponse.json(sprint)
+  } catch (e) {
+    console.error("[sprints/[id] PATCH]", e)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  await prisma.sprint.delete({ where: { id: params.id } })
-  return NextResponse.json({ ok: true })
+  try {
+    await prisma.sprint.delete({ where: { id: params.id } })
+    return NextResponse.json({ ok: true })
+  } catch (e) {
+    console.error("[sprints/[id] DELETE]", e)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
 }

@@ -15,15 +15,20 @@ export async function PATCH(
   const session = await auth()
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const body = await req.json()
-  const parsed = patchSchema.safeParse(body)
-  if (!parsed.success) return NextResponse.json({ error: "Invalid" }, { status: 400 })
+  try {
+    const body = await req.json()
+    const parsed = patchSchema.safeParse(body)
+    if (!parsed.success) return NextResponse.json({ error: "Invalid" }, { status: 400 })
 
-  const sub = await prisma.workflowSubStep.update({
-    where: { id: params.subId, stepId: params.stepId },
-    data: parsed.data,
-  })
-  return NextResponse.json(sub)
+    const sub = await prisma.workflowSubStep.update({
+      where: { id: params.subId, stepId: params.stepId },
+      data: parsed.data,
+    })
+    return NextResponse.json(sub)
+  } catch (e) {
+    console.error("[projects/[id]/workflow/[stepId]/substeps/[subId] PATCH]", e)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
 }
 
 export async function DELETE(
@@ -33,8 +38,13 @@ export async function DELETE(
   const session = await auth()
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  await prisma.workflowSubStep.delete({
-    where: { id: params.subId, stepId: params.stepId },
-  })
-  return new NextResponse(null, { status: 204 })
+  try {
+    await prisma.workflowSubStep.delete({
+      where: { id: params.subId, stepId: params.stepId },
+    })
+    return new NextResponse(null, { status: 204 })
+  } catch (e) {
+    console.error("[projects/[id]/workflow/[stepId]/substeps/[subId] DELETE]", e)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
 }

@@ -24,53 +24,63 @@ export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const dateStr = req.nextUrl.searchParams.get("date") ?? new Date().toISOString().split("T")[0]
-  const date = new Date(dateStr + "T00:00:00.000Z")
+  try {
+    const dateStr = req.nextUrl.searchParams.get("date") ?? new Date().toISOString().split("T")[0]
+    const date = new Date(dateStr + "T00:00:00.000Z")
 
-  const entry = await prisma.dailyEntry.findUnique({
-    where: { userId_date: { userId: session.user.id, date } },
-    include: { tasks: { orderBy: { order: "asc" } } },
-  })
+    const entry = await prisma.dailyEntry.findUnique({
+      where: { userId_date: { userId: session.user.id, date } },
+      include: { tasks: { orderBy: { order: "asc" } } },
+    })
 
-  return NextResponse.json(entry)
+    return NextResponse.json(entry)
+  } catch (e) {
+    console.error("[tracker/daily GET]", e)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
 }
 
 export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const body = await req.json()
-  const parsed = entrySchema.safeParse(body)
-  if (!parsed.success) return NextResponse.json({ error: "Invalid data" }, { status: 400 })
+  try {
+    const body = await req.json()
+    const parsed = entrySchema.safeParse(body)
+    if (!parsed.success) return NextResponse.json({ error: "Invalid data" }, { status: 400 })
 
-  const { date: dateStr, tasks, notes, blockers, mood } = parsed.data
-  const date = new Date(dateStr + "T00:00:00.000Z")
+    const { date: dateStr, tasks, notes, blockers, mood } = parsed.data
+    const date = new Date(dateStr + "T00:00:00.000Z")
 
-  const entry = await prisma.dailyEntry.upsert({
-    where: { userId_date: { userId: session.user.id, date } },
-    update: { notes, blockers, mood, tasks: { deleteMany: {} } },
-    create: { userId: session.user.id, date, notes, blockers, mood },
-  })
-
-  // Recreate tasks
-  if (tasks.length > 0) {
-    await prisma.dailyTask.createMany({
-      data: tasks.map((t, i) => ({
-        entryId: entry.id,
-        description: t.description,
-        projectId: t.projectId || null,
-        projectName: t.projectName || null,
-        hours: t.hours,
-        status: t.status,
-        order: i,
-      })),
+    const entry = await prisma.dailyEntry.upsert({
+      where: { userId_date: { userId: session.user.id, date } },
+      update: { notes, blockers, mood, tasks: { deleteMany: {} } },
+      create: { userId: session.user.id, date, notes, blockers, mood },
     })
+
+    // Recreate tasks
+    if (tasks.length > 0) {
+      await prisma.dailyTask.createMany({
+        data: tasks.map((t, i) => ({
+          entryId: entry.id,
+          description: t.description,
+          projectId: t.projectId || null,
+          projectName: t.projectName || null,
+          hours: t.hours,
+          status: t.status,
+          order: i,
+        })),
+      })
+    }
+
+    const result = await prisma.dailyEntry.findUnique({
+      where: { id: entry.id },
+      include: { tasks: { orderBy: { order: "asc" } } },
+    })
+
+    return NextResponse.json(result)
+  } catch (e) {
+    console.error("[tracker/daily POST]", e)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
-
-  const result = await prisma.dailyEntry.findUnique({
-    where: { id: entry.id },
-    include: { tasks: { orderBy: { order: "asc" } } },
-  })
-
-  return NextResponse.json(result)
 }

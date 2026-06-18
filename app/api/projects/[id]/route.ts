@@ -6,49 +6,64 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
   const session = await auth()
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const project = await prisma.project.findUnique({
-    where: { id: params.id },
-    include: {
-      owner: { select: { id: true, name: true, image: true } },
-      members: { include: { user: { select: { id: true, name: true, image: true, role: true } } } },
-      phases: { orderBy: { order: "asc" } },
-      _count: { select: { tickets: true, members: true } },
-    },
-  })
+  try {
+    const project = await prisma.project.findUnique({
+      where: { id: params.id },
+      include: {
+        owner: { select: { id: true, name: true, image: true } },
+        members: { include: { user: { select: { id: true, name: true, image: true, role: true } } } },
+        phases: { orderBy: { order: "asc" } },
+        _count: { select: { tickets: true, members: true } },
+      },
+    })
 
-  if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 })
-  return NextResponse.json(project)
+    if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 })
+    return NextResponse.json(project)
+  } catch (e) {
+    console.error("[projects/[id] GET]", e)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const body = await req.json()
-  const updated = await prisma.project.update({
-    where: { id: params.id },
-    data: {
-      name: body.name,
-      description: body.description,
-      status: body.status,
-      priority: body.priority,
-      dueDate: body.dueDate ? new Date(body.dueDate) : undefined,
-      startDate: body.startDate ? new Date(body.startDate) : undefined,
-    },
-  })
-  return NextResponse.json(updated)
+  try {
+    const body = await req.json()
+    const updated = await prisma.project.update({
+      where: { id: params.id },
+      data: {
+        name: body.name,
+        description: body.description,
+        status: body.status,
+        priority: body.priority,
+        dueDate: body.dueDate ? new Date(body.dueDate) : undefined,
+        startDate: body.startDate ? new Date(body.startDate) : undefined,
+      },
+    })
+    return NextResponse.json(updated)
+  } catch (e) {
+    console.error("[projects/[id] PATCH]", e)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
 }
 
 export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const project = await prisma.project.findUnique({ where: { id: params.id } })
-  if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 })
-  if (project.ownerId !== session.user.id && session.user.role !== "ADMIN") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
-  }
+  try {
+    const project = await prisma.project.findUnique({ where: { id: params.id } })
+    if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 })
+    if (project.ownerId !== session.user.id && session.user.role !== "ADMIN") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
 
-  await prisma.project.delete({ where: { id: params.id } })
-  return NextResponse.json({ success: true })
+    await prisma.project.delete({ where: { id: params.id } })
+    return NextResponse.json({ success: true })
+  } catch (e) {
+    console.error("[projects/[id] DELETE]", e)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
 }

@@ -14,57 +14,68 @@ const createSchema = z.object({
 export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  const userId = session.user.id
 
-  const simple = req.nextUrl.searchParams.get("simple")
+  try {
+    const userId = session.user.id
 
-  const where = { OR: [{ ownerId: userId }, { members: { some: { userId } } }] }
+    const simple = req.nextUrl.searchParams.get("simple")
 
-  const projects = simple
-    ? await prisma.project.findMany({
-        where,
-        select: { id: true, name: true },
-        orderBy: { updatedAt: "desc" },
-      })
-    : await prisma.project.findMany({
-        where,
-        include: {
-          _count: { select: { tickets: true, members: true } },
-          members: {
-            include: { user: { select: { id: true, name: true, image: true } } },
-            take: 5,
+    const where = { OR: [{ ownerId: userId }, { members: { some: { userId } } }] }
+
+    const projects = simple
+      ? await prisma.project.findMany({
+          where,
+          select: { id: true, name: true },
+          orderBy: { updatedAt: "desc" },
+        })
+      : await prisma.project.findMany({
+          where,
+          include: {
+            _count: { select: { tickets: true, members: true } },
+            members: {
+              include: { user: { select: { id: true, name: true, image: true } } },
+              take: 5,
+            },
+            owner: { select: { id: true, name: true, image: true } },
           },
-          owner: { select: { id: true, name: true, image: true } },
-        },
-        orderBy: { updatedAt: "desc" },
-      })
+          orderBy: { updatedAt: "desc" },
+        })
 
-  return NextResponse.json({ data: projects })
+    return NextResponse.json({ data: projects })
+  } catch (e) {
+    console.error("[projects GET]", e)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
 }
 
 export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const body = await req.json()
-  const parsed = createSchema.safeParse(body)
-  if (!parsed.success) return NextResponse.json({ error: "Invalid data" }, { status: 400 })
+  try {
+    const body = await req.json()
+    const parsed = createSchema.safeParse(body)
+    if (!parsed.success) return NextResponse.json({ error: "Invalid data" }, { status: 400 })
 
-  const { name, description, priority, dueDate, startDate } = parsed.data
+    const { name, description, priority, dueDate, startDate } = parsed.data
 
-  const project = await prisma.project.create({
-    data: {
-      name,
-      description,
-      priority,
-      dueDate: dueDate ? new Date(dueDate) : undefined,
-      startDate: startDate ? new Date(startDate) : undefined,
-      ownerId: session.user.id,
-      members: {
-        create: { userId: session.user.id, role: "PROJECT_MANAGER" },
+    const project = await prisma.project.create({
+      data: {
+        name,
+        description,
+        priority,
+        dueDate: dueDate ? new Date(dueDate) : undefined,
+        startDate: startDate ? new Date(startDate) : undefined,
+        ownerId: session.user.id,
+        members: {
+          create: { userId: session.user.id, role: "PROJECT_MANAGER" },
+        },
       },
-    },
-  })
+    })
 
-  return NextResponse.json(project, { status: 201 })
+    return NextResponse.json(project, { status: 201 })
+  } catch (e) {
+    console.error("[projects POST]", e)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
 }

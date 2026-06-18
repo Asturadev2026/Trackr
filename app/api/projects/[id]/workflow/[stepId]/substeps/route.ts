@@ -12,22 +12,27 @@ export async function POST(
   const session = await auth()
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const body = await req.json()
-  const parsed = createSchema.safeParse(body)
-  if (!parsed.success) return NextResponse.json({ error: "Invalid" }, { status: 400 })
+  try {
+    const body = await req.json()
+    const parsed = createSchema.safeParse(body)
+    if (!parsed.success) return NextResponse.json({ error: "Invalid" }, { status: 400 })
 
-  const last = await prisma.workflowSubStep.findFirst({
-    where: { stepId: params.stepId },
-    orderBy: { order: "desc" },
-    select: { order: true },
-  })
+    const last = await prisma.workflowSubStep.findFirst({
+      where: { stepId: params.stepId },
+      orderBy: { order: "desc" },
+      select: { order: true },
+    })
 
-  const sub = await prisma.workflowSubStep.create({
-    data: {
-      stepId: params.stepId,
-      name: parsed.data.name,
-      order: (last?.order ?? -1) + 1,
-    },
-  })
-  return NextResponse.json(sub, { status: 201 })
+    const sub = await prisma.workflowSubStep.create({
+      data: {
+        stepId: params.stepId,
+        name: parsed.data.name,
+        order: (last?.order ?? -1) + 1,
+      },
+    })
+    return NextResponse.json(sub, { status: 201 })
+  } catch (e) {
+    console.error("[projects/[id]/workflow/[stepId]/substeps POST]", e)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
 }
