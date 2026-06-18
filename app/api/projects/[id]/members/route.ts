@@ -21,6 +21,7 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  if (session.user.role === "INTERN") return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
   try {
     const body = await req.json()
@@ -41,8 +42,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     await prisma.projectMember.upsert({
       where: { projectId_userId: { projectId: params.id, userId } },
-      update: { role: role ?? "DEVELOPER" },
-      create: { projectId: params.id, userId, role: role ?? "DEVELOPER" },
+      update: { role: role ?? "AI_ENGINEER" },
+      create: { projectId: params.id, userId, role: role ?? "AI_ENGINEER" },
     })
 
     const members = await prisma.projectMember.findMany({
@@ -62,6 +63,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  if (session.user.role === "INTERN") return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
   try {
     const { searchParams } = new URL(req.url)

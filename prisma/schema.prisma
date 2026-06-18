@@ -16,7 +16,7 @@ model User {
   emailVerified DateTime?
   image         String?
   password      String?
-  role          UserRole  @default(DEVELOPER)
+  role          UserRole  @default(AI_ENGINEER)
   isActive      Boolean   @default(true)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -36,10 +36,11 @@ model User {
 
 enum UserRole {
   ADMIN
-  PROJECT_MANAGER
-  DEVELOPER
-  DESIGNER
-  VIEWER
+  AI_ENGINEER
+  INTERN
+  SENIOR_ENGINEER
+  MANAGER
+  BUSINESS
 }
 
 model Account {
@@ -139,7 +140,7 @@ model ProjectMember {
   id        String   @id @default(cuid())
   projectId String
   userId    String
-  role      UserRole @default(DEVELOPER)
+  role      UserRole @default(AI_ENGINEER)
   joinedAt  DateTime @default(now())
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)

@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
         startDate: startDate ? new Date(startDate) : undefined,
         ownerId: session.user.id,
         members: {
-          create: { userId: session.user.id, role: "PROJECT_MANAGER" },
+          create: { userId: session.user.id, role: "MANAGER" },
         },
       },
     })

@@ -93,7 +93,7 @@ export function ProjectDetailClient({ project, stats, recentTickets, allTickets,
   const [members, setMembers] = useState<any[]>(project.members ?? [])
   const [showAddMember, setShowAddMember] = useState(false)
   const [selectedUserId, setSelectedUserId] = useState("")
-  const [selectedRole, setSelectedRole] = useState("DEVELOPER")
+  const [selectedRole, setSelectedRole] = useState("AI_ENGINEER")
   const [addingMember, setAddingMember] = useState(false)
 
   const memberIds = new Set(members.map((m: any) => m.userId))
@@ -112,7 +112,7 @@ export function ProjectDetailClient({ project, stats, recentTickets, allTickets,
       const user = platformUsers.find((u) => u.id === selectedUserId)!
       setMembers((prev) => [...prev, { userId: selectedUserId, role: selectedRole, user }])
       setSelectedUserId("")
-      setSelectedRole("DEVELOPER")
+      setSelectedRole("AI_ENGINEER")
       setShowAddMember(false)
       toast.success(`${user.name} added to project`)
     } catch {
@@ -828,10 +828,11 @@ export function ProjectDetailClient({ project, stats, recentTickets, allTickets,
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="PROJECT_MANAGER">Project Manager</SelectItem>
-                            <SelectItem value="DEVELOPER">Developer</SelectItem>
-                            <SelectItem value="DESIGNER">Designer</SelectItem>
-                            <SelectItem value="VIEWER">Viewer</SelectItem>
+                            <SelectItem value="MANAGER">Manager</SelectItem>
+                            <SelectItem value="SENIOR_ENGINEER">Senior Engineer</SelectItem>
+                            <SelectItem value="AI_ENGINEER">AI Engineer</SelectItem>
+                            <SelectItem value="BUSINESS">Business</SelectItem>
+                            <SelectItem value="INTERN">Intern</SelectItem>
                           </SelectContent>
                         </Select>
                         <div className="flex gap-2">

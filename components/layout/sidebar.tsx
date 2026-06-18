@@ -12,19 +12,23 @@ import {
   Settings,
   Zap,
   Timer,
+  UsersRound,
 } from "lucide-react"
+import { useSession } from "next-auth/react"
 import { cn } from "@/lib/utils"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { hasMyTracker, hasTeamTracker } from "@/lib/roles"
 
-const navItems = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Projects", href: "/projects", icon: FolderKanban },
-  { label: "Tickets", href: "/tickets", icon: Ticket },
-  { label: "My Tracker", href: "/my-tracker", icon: CalendarDays },
-  { label: "Sprints", href: "/sprints", icon: Timer },
-  { label: "Reports", href: "/reports", icon: BarChart3 },
-  { label: "Team", href: "/team", icon: Users },
+const allNavItems = [
+  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, key: "dashboard" },
+  { label: "Projects", href: "/projects", icon: FolderKanban, key: "projects" },
+  { label: "Tickets", href: "/tickets", icon: Ticket, key: "tickets" },
+  { label: "My Tracker", href: "/my-tracker", icon: CalendarDays, key: "my-tracker" },
+  { label: "Team Tracker", href: "/team-tracker", icon: UsersRound, key: "team-tracker" },
+  { label: "Sprints", href: "/sprints", icon: Timer, key: "sprints" },
+  { label: "Reports", href: "/reports", icon: BarChart3, key: "reports" },
+  { label: "Team", href: "/team", icon: Users, key: "team" },
 ]
 
 const bottomItems = [
@@ -33,6 +37,14 @@ const bottomItems = [
 
 export function Sidebar() {
   const pathname = usePathname()
+  const { data: session } = useSession()
+  const role = session?.user?.role ?? ""
+
+  const navItems = allNavItems.filter((item) => {
+    if (item.key === "my-tracker") return hasMyTracker(role)
+    if (item.key === "team-tracker") return hasTeamTracker(role)
+    return true
+  })
 
   return (
     <TooltipProvider delayDuration={0}>

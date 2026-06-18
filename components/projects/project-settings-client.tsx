@@ -43,7 +43,7 @@ export function ProjectSettingsClient({ project: initial }: { project: Project }
   const router = useRouter()
   const [project, setProject] = useState(initial)
   const [inviteEmail, setInviteEmail] = useState("")
-  const [inviteRole, setInviteRole] = useState("DEVELOPER")
+  const [inviteRole, setInviteRole] = useState("AI_ENGINEER")
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -223,9 +223,12 @@ export function ProjectSettingsClient({ project: initial }: { project: Project }
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {["DEVELOPER", "DESIGNER", "PROJECT_MANAGER", "VIEWER"].map((r) => (
-                    <SelectItem key={r} value={r}>{r.replace("_", " ")}</SelectItem>
-                  ))}
+                  <SelectItem value="ADMIN">Admin</SelectItem>
+                  <SelectItem value="MANAGER">Manager</SelectItem>
+                  <SelectItem value="SENIOR_ENGINEER">Senior Engineer</SelectItem>
+                  <SelectItem value="AI_ENGINEER">AI Engineer</SelectItem>
+                  <SelectItem value="BUSINESS">Business</SelectItem>
+                  <SelectItem value="INTERN">Intern</SelectItem>
                 </SelectContent>
               </Select>
               <Button size="sm" className="shrink-0 gap-1" onClick={handleAddMember}>

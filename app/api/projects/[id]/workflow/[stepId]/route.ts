@@ -14,6 +14,7 @@ export async function PATCH(
 ) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  if (session.user.role === "INTERN") return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
   try {
     const body = await req.json()
@@ -37,6 +38,7 @@ export async function DELETE(
 ) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  if (session.user.role === "INTERN") return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
   try {
     await prisma.workflowStep.delete({

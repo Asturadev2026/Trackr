@@ -7,7 +7,7 @@ import bcrypt from "bcryptjs"
 const createSchema = z.object({
   name: z.string().min(1),
   email: z.string().email(),
-  role: z.enum(["ADMIN", "PROJECT_MANAGER", "DEVELOPER", "DESIGNER", "VIEWER"]).default("DEVELOPER"),
+  role: z.enum(["ADMIN", "AI_ENGINEER", "INTERN", "SENIOR_ENGINEER", "MANAGER", "BUSINESS"]).default("AI_ENGINEER"),
   password: z.string().min(8),
 })
 
@@ -34,7 +34,8 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   try {
-    if (session.user.role !== "ADMIN" && session.user.role !== "PROJECT_MANAGER") {
+    const canManage = ["ADMIN", "MANAGER", "AI_ENGINEER", "SENIOR_ENGINEER", "BUSINESS"].includes(session.user.role)
+    if (!canManage) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 

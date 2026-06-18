@@ -22,7 +22,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     const isOwner = project.ownerId === session.user.id
     const isManager = project.members.some(
-      (m) => m.userId === session.user.id && m.role === "PROJECT_MANAGER"
+      (m) => m.userId === session.user.id && m.role === "MANAGER"
     )
     if (!isOwner && !isManager) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 

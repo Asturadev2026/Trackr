@@ -28,7 +28,7 @@ import {
 const schema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Valid email required"),
-  role: z.enum(["ADMIN", "PROJECT_MANAGER", "DEVELOPER", "DESIGNER", "VIEWER"]),
+  role: z.enum(["ADMIN", "AI_ENGINEER", "INTERN", "SENIOR_ENGINEER", "MANAGER", "BUSINESS"]),
   password: z.string().min(8, "Password must be at least 8 characters"),
 })
 
@@ -52,7 +52,7 @@ export function InviteUserDialog({
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { role: "DEVELOPER" },
+    defaultValues: { role: "AI_ENGINEER" },
   })
 
   const onSubmit = async (data: FormData) => {
@@ -93,16 +93,17 @@ export function InviteUserDialog({
             </div>
             <div className="space-y-1.5">
               <Label>Role</Label>
-              <Select defaultValue="DEVELOPER" onValueChange={(v) => setValue("role", v as any)}>
+              <Select defaultValue="AI_ENGINEER" onValueChange={(v) => setValue("role", v as any)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ADMIN">Admin</SelectItem>
-                  <SelectItem value="PROJECT_MANAGER">Project Manager</SelectItem>
-                  <SelectItem value="DEVELOPER">Developer</SelectItem>
-                  <SelectItem value="DESIGNER">Designer</SelectItem>
-                  <SelectItem value="VIEWER">Viewer</SelectItem>
+                  <SelectItem value="MANAGER">Manager</SelectItem>
+                  <SelectItem value="SENIOR_ENGINEER">Senior Engineer</SelectItem>
+                  <SelectItem value="AI_ENGINEER">AI Engineer</SelectItem>
+                  <SelectItem value="BUSINESS">Business</SelectItem>
+                  <SelectItem value="INTERN">Intern</SelectItem>
                 </SelectContent>
               </Select>
             </div>

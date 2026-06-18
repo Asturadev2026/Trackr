@@ -22,6 +22,11 @@ export default async function DashboardPage() {
     OR: [{ ownerId: userId }, { members: { some: { userId } } }],
   }
 
+  const weekStart = new Date()
+  const dow = weekStart.getUTCDay()
+  weekStart.setUTCDate(weekStart.getUTCDate() + (dow === 0 ? -6 : 1 - dow))
+  weekStart.setUTCHours(0, 0, 0, 0)
+
   // All 8 queries run in parallel — ticketGroups no longer waits for projects
   const [myTickets, projects, openTicketCount, totalUsers, totalTickets, totalProjects, weeklyHours, ticketGroups] =
     await Promise.all([
@@ -54,7 +59,7 @@ export default async function DashboardPage() {
         where: {
           entry: {
             userId,
-            date: { gte: new Date(new Date().setDate(new Date().getDate() - 7)) },
+            date: { gte: weekStart },
           },
         },
         _sum: { hours: true },

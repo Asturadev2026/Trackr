@@ -76,7 +76,9 @@ export async function POST(req: NextRequest) {
     const parsed = createSchema.safeParse(body)
     if (!parsed.success) return NextResponse.json({ error: "Invalid data", details: parsed.error }, { status: 400 })
 
-    const { title, description, type, priority, projectId, assigneeId, dueDate, labels } = parsed.data
+    const { title, description, type, priority, projectId, dueDate, labels } = parsed.data
+    // Interns can only assign tickets to themselves
+    const assigneeId = session.user.role === "INTERN" ? session.user.id : parsed.data.assigneeId
 
     // Generate ticket key
     const project = await prisma.project.findUnique({

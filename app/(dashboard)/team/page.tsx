@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: "Team" }
 export default async function TeamPage() {
   const session = await getSession()
   const userId = session!.user.id
-  const isAdmin = session!.user.role === "ADMIN" || session!.user.role === "PROJECT_MANAGER"
+  const isAdmin = ["ADMIN", "MANAGER", "AI_ENGINEER", "SENIOR_ENGINEER", "BUSINESS"].includes(session!.user.role)
 
   const users = await prisma.user.findMany({
     where: { isActive: true },
