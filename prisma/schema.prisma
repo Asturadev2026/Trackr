@@ -100,6 +100,7 @@ model Project {
   phases        Phase[]
   sprints       Sprint[]
   workflowSteps WorkflowStep[]
+  attachments   Attachment[]
 
   @@index([ownerId])
   @@index([status])
@@ -308,16 +309,22 @@ model Comment {
 // ─── Attachments ─────────────────────────────────────────────────────────────
 
 model Attachment {
-  id        String   @id @default(cuid())
-  name      String
-  url       String
-  size      Int
-  mimeType  String
-  ticketId  String
+  id           String   @id @default(cuid())
+  name         String
+  url          String
+  size         Int
+  mimeType     String
+  ticketId     String?
+  projectId    String?
   uploadedById String
-  createdAt DateTime @default(now())
+  createdAt    DateTime @default(now())
 
-  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  ticket  Ticket?  @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@index([projectId])
+  @@index([createdAt(sort: Desc)])
 }
 
 // ─── Daily Tracker ───────────────────────────────────────────────────────────

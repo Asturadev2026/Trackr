@@ -13,9 +13,9 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData()
     const file = formData.get("file") as File | null
     const ticketId = formData.get("ticketId") as string | null
+    const projectId = formData.get("projectId") as string | null
 
     if (!file) return NextResponse.json({ error: "No file provided" }, { status: 400 })
-    if (!ticketId) return NextResponse.json({ error: "ticketId required" }, { status: 400 })
 
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
@@ -32,12 +32,13 @@ export async function POST(req: NextRequest) {
 
     const attachment = await prisma.attachment.create({
       data: {
-        ticketId,
+        ticketId: ticketId || null,
+        projectId: projectId || null,
         uploadedById: session.user.id,
         name: file.name,
         url,
         size: file.size,
-        mimeType: file.type,
+        mimeType: file.type || "application/octet-stream",
       },
     })
 

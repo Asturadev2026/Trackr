@@ -13,6 +13,7 @@ import {
   Zap,
   Timer,
   UsersRound,
+  Files,
 } from "lucide-react"
 import { useSession } from "next-auth/react"
 import { cn } from "@/lib/utils"
@@ -24,6 +25,7 @@ const allNavItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, key: "dashboard" },
   { label: "Projects", href: "/projects", icon: FolderKanban, key: "projects" },
   { label: "Tickets", href: "/tickets", icon: Ticket, key: "tickets" },
+  { label: "Documents", href: "/documents", icon: Files, key: "documents" },
   { label: "My Tracker", href: "/my-tracker", icon: CalendarDays, key: "my-tracker" },
   { label: "Team Tracker", href: "/team-tracker", icon: UsersRound, key: "team-tracker" },
   { label: "Sprints", href: "/sprints", icon: Timer, key: "sprints" },
