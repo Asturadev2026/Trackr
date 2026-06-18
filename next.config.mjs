@@ -1,6 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  serverExternalPackages: ["@prisma/client", "xlsx"],
+  experimental: {
+    serverComponentsExternalPackages: ["@prisma/client", "xlsx"],
+  },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "utfs.io" },
