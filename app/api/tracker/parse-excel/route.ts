@@ -63,16 +63,20 @@ function parseDate(val: unknown, fallback: string): string {
     const s = val.trim()
     if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
 
-    // M/D/YYYY or M/D/YY — regex extraction, no Date() call needed
-    const mdy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/)
-    if (mdy) {
-      const mo = String(parseInt(mdy[1])).padStart(2, "0")
-      const dy = String(parseInt(mdy[2])).padStart(2, "0")
+    // D/M/YYYY or M/D/YYYY — detect format: if first number > 12 it must be the day
+    const dmy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/)
+    if (dmy) {
+      let first = parseInt(dmy[1])
+      let second = parseInt(dmy[2])
       const yr =
-        mdy[3].length === 2
-          ? String(parseInt(mdy[3]) > 50 ? 1900 + parseInt(mdy[3]) : 2000 + parseInt(mdy[3]))
-          : mdy[3]
-      return `${yr}-${mo}-${dy}`
+        dmy[3].length === 2
+          ? String(parseInt(dmy[3]) > 50 ? 1900 + parseInt(dmy[3]) : 2000 + parseInt(dmy[3]))
+          : dmy[3]
+      // If first > 12 it can't be a month → D/M/YYYY (Indian/UK format)
+      let mo: number, dy: number
+      if (first > 12) { dy = first; mo = second }
+      else             { mo = first; dy = second }
+      return `${yr}-${String(mo).padStart(2, "0")}-${String(dy).padStart(2, "0")}`
     }
 
     // Other string — parse and use local getters to avoid UTC offset issues

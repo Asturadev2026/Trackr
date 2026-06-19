@@ -60,17 +60,19 @@ export async function POST(req: NextRequest) {
     const deduped = Array.from(mergedMap.values())
 
     // Pre-compute combined notes for every entry
-    const prepared = deduped.map((e) => ({
-      ...e,
-      combinedNotes: [
-        e.weekGoal     ? `Weekly Goal: ${e.weekGoal}`        : null,
-        e.notes        ? e.notes                             : null,
-        e.managerNotes ? `Manager Review: ${e.managerNotes}` : null,
-        e.learnings    ? `Learnings: ${e.learnings}`         : null,
-        e.nextFocus    ? `Focus Next Week: ${e.nextFocus}`   : null,
-      ].filter(Boolean).join("\n\n") || null,
-      dateObj: new Date(e.date + "T00:00:00.000Z"),
-    }))
+    const prepared = deduped
+      .map((e) => ({
+        ...e,
+        combinedNotes: [
+          e.weekGoal     ? `Weekly Goal: ${e.weekGoal}`        : null,
+          e.notes        ? e.notes                             : null,
+          e.managerNotes ? `Manager Review: ${e.managerNotes}` : null,
+          e.learnings    ? `Learnings: ${e.learnings}`         : null,
+          e.nextFocus    ? `Focus Next Week: ${e.nextFocus}`   : null,
+        ].filter(Boolean).join("\n\n") || null,
+        dateObj: new Date(e.date + "T00:00:00.000Z"),
+      }))
+      .filter((e) => !isNaN(e.dateObj.getTime())) // drop invalid dates
 
     // ── Query 1: find which entries already exist ───────────────────────────────
     const existing = await prisma.dailyEntry.findMany({
