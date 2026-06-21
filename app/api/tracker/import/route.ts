@@ -159,6 +159,37 @@ export async function POST(req: NextRequest) {
       await prisma.dailyTask.createMany({ data: allTasks })
     }
 
+    // ── Save weekly goals to WeeklyGoal table ────────────────────────────────────
+    const goalUpserts = prepared
+      .filter((e) => e.weekGoal?.trim())
+      .map((e) => {
+        // Compute Monday of this entry's week
+        const d = new Date(e.dateObj)
+        const dow = d.getUTCDay()
+        const diff = dow === 0 ? -6 : 1 - dow
+        d.setUTCDate(d.getUTCDate() + diff)
+        d.setUTCHours(0, 0, 0, 0)
+        return { weekStart: d, goal: e.weekGoal!.trim() }
+      })
+      // keep only first goal per week start
+      .reduce<{ weekStart: Date; goal: string }[]>((acc, item) => {
+        const key = item.weekStart.toISOString()
+        if (!acc.find((x) => x.weekStart.toISOString() === key)) acc.push(item)
+        return acc
+      }, [])
+
+    if (goalUpserts.length > 0) {
+      await Promise.all(
+        goalUpserts.map((g) =>
+          prisma.weeklyGoal.upsert({
+            where: { userId_weekStart: { userId, weekStart: g.weekStart } },
+            create: { userId, weekStart: g.weekStart, goal: g.goal },
+            update: { goal: g.goal },
+          })
+        )
+      )
+    }
+
     return NextResponse.json({ imported: prepared.length, tasks: allTasks.length })
   } catch (e) {
     console.error("[tracker/import POST]", e)

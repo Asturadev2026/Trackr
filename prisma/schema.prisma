@@ -29,6 +29,7 @@ model User {
   reportedTickets   Ticket[]        @relation("TicketReporter")
   comments          Comment[]
   dailyEntries      DailyEntry[]
+  weeklyGoals       WeeklyGoal[]
   notifications     Notification[]
   watchedTickets    TicketWatcher[]
   activityLogs      ActivityLog[]
@@ -364,6 +365,20 @@ enum TaskStatus {
   IN_PROGRESS
   DONE
   BLOCKED
+}
+
+model WeeklyGoal {
+  id        String   @id @default(cuid())
+  userId    String
+  weekStart DateTime @db.Date
+  goal      String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, weekStart])
+  @@index([userId])
 }
 
 // ─── Notifications ───────────────────────────────────────────────────────────
