@@ -214,7 +214,7 @@ export function DailyTeamView({ date, projectId, projectName, members, stats, no
           <thead>
             <tr className="border-b bg-muted/30">
               <th className="px-4 py-3 text-left font-medium text-muted-foreground w-44">Member</th>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Today's work</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Today&apos;s work</th>
               <th className="px-4 py-3 text-right font-medium text-muted-foreground w-20">Hours</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground w-28">Status</th>
               <th className="w-10" />
