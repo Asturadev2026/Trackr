@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
-import { Plus, Trash2, ChevronLeft, ChevronRight, Upload, Loader2 } from "lucide-react"
+import { Plus, Trash2, ChevronLeft, ChevronRight, Upload, Download, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -120,6 +120,11 @@ export function DailyTrackerClient({ entry, projects, currentDate, weekData, use
     }
   }
 
+  // Download the user's full planner as the same Excel format they imported.
+  const exportExcel = () => {
+    window.location.href = "/api/tracker/export"
+  }
+
   const navigateDate = (direction: -1 | 1) => {
     const d = new Date(currentDate + "T00:00:00Z")
     d.setUTCDate(d.getUTCDate() + direction)
@@ -146,6 +151,10 @@ export function DailyTrackerClient({ entry, projects, currentDate, weekData, use
             <Button variant="outline" size="sm" className="h-8" onClick={() => setImportOpen(true)}>
               <Upload className="h-3.5 w-3.5" />
               Import Excel
+            </Button>
+            <Button variant="outline" size="sm" className="h-8" onClick={exportExcel}>
+              <Download className="h-3.5 w-3.5" />
+              Export Excel
             </Button>
             <Button size="sm" className="h-8" onClick={save} disabled={saving}>
               {saving && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}

@@ -32,6 +32,11 @@ model User {
   notifications     Notification[]
   watchedTickets    TicketWatcher[]
   activityLogs      ActivityLog[]
+
+  // ── Planner import/export (faithful copy of imported Excel) ──
+  plannerMeta       PlannerMeta?
+  weeklyPlannerRows WeeklyPlannerRow[]
+  dailyPlannerRows  DailyPlannerRow[]
 }
 
 enum UserRole {
@@ -366,6 +371,73 @@ enum TaskStatus {
   BLOCKED
 }
 
+// ─── Planner Import / Export ─────────────────────────────────────────────────
+// Faithful copy of an imported Excel planner so Export reproduces the file
+// exactly (same columns, order, dates, sheet names). Dates are stored as the
+// EXACT text shown in the cell, so any user's date format round-trips perfectly.
+// Separate from DailyEntry/DailyTask so the existing My Tracker UI is unaffected.
+
+model PlannerMeta {
+  userId          String   @id
+  fileBaseName    String?
+  weeklySheetName String?
+  dailySheetName  String?
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model WeeklyPlannerRow {
+  id             String   @id @default(cuid())
+  userId         String
+  rowIndex       Int      @default(0)
+
+  weekStart      String? // exact text as shown in the cell (e.g. "01/05/2026")
+  weekEnd        String?
+  employeeName   String?
+  role           String?
+  manager        String?
+  weeklyGoal     String?  @db.Text
+  keyDeliverable String?  @db.Text
+  deadline       String?
+  priority       String?
+  risksBlockers  String?  @db.Text
+  reviewNotes    String?  @db.Text
+  learnings      String?  @db.Text
+  nextFocus      String?  @db.Text
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model DailyPlannerRow {
+  id              String   @id @default(cuid())
+  userId          String
+  rowIndex        Int      @default(0)
+
+  date            String? // exact text as shown in the cell (e.g. "01/05/2026")
+  employeeName    String?
+  role            String?
+  manager         String?
+  taskDescription String?  @db.Text
+  whyMatters      String?  @db.Text
+  timeFrom        String?
+  timeTo          String?
+  supportNeeded   String?
+  endOfDayStatus  String?
+  carryTomorrow   String?
+  notes           String?  @db.Text
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
 // ─── Notifications ───────────────────────────────────────────────────────────
 
 model Notification {
@@ -411,4 +483,6 @@ model ActivityLog {
 
   @@index([ticketId])
   @@index([createdAt(sort: Desc)])
+
+  
 }
