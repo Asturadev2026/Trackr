@@ -111,7 +111,7 @@ export function SearchClient({ query: initialQuery, tickets, projects }: Props) 
       {q.trim() && total === 0 && !isPending && (
         <div className="text-center py-16 text-muted-foreground">
           <Search className="h-8 w-8 mx-auto mb-3 opacity-30" />
-          <p className="text-sm">No results found for "{q}"</p>
+          <p className="text-sm">No results found for &quot;{q}&quot;</p>
         </div>
       )}
 
