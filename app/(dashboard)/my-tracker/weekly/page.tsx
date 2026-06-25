@@ -64,12 +64,18 @@ export default async function WeeklyTrackerPage({
 
   const totalHours = allTasks.reduce((s, t) => s + t.hours, 0)
 
+  const goalRecord = await prisma.weeklyGoal.findUnique({
+    where: { userId_weekStart: { userId, weekStart } },
+    select: { goal: true },
+  })
+
   return (
     <WeeklyTrackerClient
       weekDays={weekDays}
       weekStart={weekStart.toISOString().split("T")[0]}
       byProject={Object.values(byProject)}
       totalHours={totalHours}
+      weeklyGoal={goalRecord?.goal ?? null}
     />
   )
 }
