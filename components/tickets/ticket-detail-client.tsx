@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
 import {
@@ -12,11 +12,24 @@ import {
   Tag,
   Loader2,
   MoreHorizontal,
+  X,
+  Clock,
+  Edit2,
+  Check,
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
 import { MentionTextarea, renderMentions } from "@/components/tickets/mention-textarea"
 import {
   Select,
@@ -38,9 +51,10 @@ interface Props {
   projectMembers: { id: string; name: string | null; image: string | null }[]
   isWatching: boolean
   currentUserId: string
+  userRole?: string
 }
 
-export function TicketDetailClient({ ticket, projectMembers, isWatching, currentUserId }: Props) {
+export function TicketDetailClient({ ticket, projectMembers, isWatching, currentUserId, userRole }: Props) {
   const [comment, setComment] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [watching, setWatching] = useState(isWatching)
@@ -48,6 +62,18 @@ export function TicketDetailClient({ ticket, projectMembers, isWatching, current
   const [assigneeId, setAssigneeId] = useState(ticket.assigneeId ?? "unassigned")
   const [priority, setPriority] = useState(ticket.priority)
   const [localComments, setLocalComments] = useState(ticket.comments)
+  const [uploading, setUploading] = useState(false)
+  const [preview, setPreview] = useState<{ name: string; type: string; data: string } | null>(null)
+  const [attachments, setAttachments] = useState(ticket.attachments)
+  const [uploadedFile, setUploadedFile] = useState<{ name: string; size: number; type: string; url: string } | null>(null)
+  const [showUploadDialog, setShowUploadDialog] = useState(false)
+  const [estimatedHours, setEstimatedHours] = useState(ticket.estimatedHours ?? 0)
+  const [editingDescription, setEditingDescription] = useState(false)
+  const [editedDescription, setEditedDescription] = useState(ticket.description ?? "")
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Check if user can edit description (admin or assigned person)
+  const canEditDescription = userRole === "ADMIN" || ticket.assigneeId === currentUserId
 
   const updateField = async (field: string, value: string) => {
     try {
@@ -60,6 +86,23 @@ export function TicketDetailClient({ ticket, projectMembers, isWatching, current
       toast.success("Updated")
     } catch {
       toast.error("Failed to update")
+    }
+  }
+
+  const updateEstimatedHours = async () => {
+    const normalizedHours = Number.isFinite(estimatedHours) ? Math.max(0, Math.floor(estimatedHours)) : 0
+    setEstimatedHours(normalizedHours)
+
+    try {
+      const res = await fetch(`/api/tickets/${ticket.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ estimatedHours: normalizedHours }),
+      })
+      if (!res.ok) throw new Error()
+      toast.success("Estimated hours updated")
+    } catch {
+      toast.error("Failed to update estimated hours")
     }
   }
 
@@ -97,8 +140,168 @@ export function TicketDetailClient({ ticket, projectMembers, isWatching, current
     }
   }
 
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const allowedTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/gif",
+      "image/webp",
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/vnd.ms-excel",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ]
+
+    if (!allowedTypes.includes(file.type)) {
+      toast.error("File type not supported. Please upload an image, PDF, or document.")
+      return
+    }
+
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error("File size must be less than 50MB")
+      return
+    }
+
+    setUploading(true)
+
+    try {
+      // Create preview
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const data = e.target?.result as string
+        setPreview({
+          name: file.name,
+          type: file.type,
+          data,
+        })
+      }
+      reader.readAsDataURL(file)
+
+      // Upload file
+      const formData = new FormData()
+      formData.append("file", file)
+      formData.append("ticketId", ticket.id)
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      })
+
+      if (!res.ok) throw new Error("Upload failed")
+
+      const attachment = await res.json()
+      setAttachments((prev) => [...prev, attachment])
+      setUploadedFile({
+        name: attachment.name,
+        size: attachment.size,
+        type: attachment.mimeType,
+        url: attachment.url,
+      })
+      setShowUploadDialog(true)
+      setPreview(null)
+
+      // Reset input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ""
+      }
+    } catch (err) {
+      console.error("Upload error:", err)
+      toast.error("Failed to upload file")
+      setPreview(null)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const isImageFile = (type: string) => type.startsWith("image/")
+  const isPdf = (type: string) => type === "application/pdf"
+
+  const updateDescription = async () => {
+    try {
+      const res = await fetch(`/api/tickets/${ticket.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: editedDescription }),
+      })
+      if (!res.ok) throw new Error()
+      setEditingDescription(false)
+      toast.success("Description updated")
+    } catch {
+      toast.error("Failed to update description")
+    }
+  }
+
   return (
     <div className="space-y-4 animate-fade-in max-w-6xl">
+      {/* Upload Success Dialog */}
+      <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>File Uploaded Successfully</DialogTitle>
+            <DialogDescription>
+              Your file has been attached to this ticket
+            </DialogDescription>
+          </DialogHeader>
+          {uploadedFile && (
+            <div className="space-y-4">
+              <div className="rounded-lg border p-4 space-y-2">
+                <div className="flex items-center gap-3">
+                  {isImageFile(uploadedFile.type) && (
+                    <div className="flex-shrink-0">
+                      <div className="w-10 h-10 rounded bg-blue-100 flex items-center justify-center">
+                        <Paperclip className="h-5 w-5 text-blue-600" />
+                      </div>
+                    </div>
+                  )}
+                  {isPdf(uploadedFile.type) && (
+                    <div className="flex-shrink-0">
+                      <div className="w-10 h-10 rounded bg-red-100 flex items-center justify-center">
+                        <Paperclip className="h-5 w-5 text-red-600" />
+                      </div>
+                    </div>
+                  )}
+                  {!isImageFile(uploadedFile.type) && !isPdf(uploadedFile.type) && (
+                    <div className="flex-shrink-0">
+                      <div className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center">
+                        <Paperclip className="h-5 w-5 text-gray-600" />
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {uploadedFile.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {(uploadedFile.size / 1024).toFixed(2)} KB
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowUploadDialog(false)}
+                >
+                  Close
+                </Button>
+                <Button
+                  onClick={() => {
+                    window.open(uploadedFile.url, "_blank")
+                    setShowUploadDialog(false)
+                  }}
+                >
+                  View File
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Breadcrumb */}
       <div className="flex items-center gap-1 text-sm text-muted-foreground">
         <Link href="/tickets" className="hover:text-foreground transition-colors">Tickets</Link>
@@ -131,35 +334,123 @@ export function TicketDetailClient({ ticket, projectMembers, isWatching, current
           {ticket.description && (
             <Card className="shadow-none">
               <CardContent className="p-4">
-                <h3 className="text-sm font-semibold mb-2">Description</h3>
-                <div className="prose prose-sm max-w-none text-sm text-foreground whitespace-pre-wrap">
-                  {ticket.description}
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-semibold">Description</h3>
+                  <div className="flex items-center gap-2">
+                    {canEditDescription && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          if (editingDescription) {
+                            updateDescription()
+                          } else {
+                            setEditingDescription(true)
+                          }
+                        }}
+                        className="h-7 text-xs"
+                      >
+                        {editingDescription ? (
+                          <><Check className="h-3.5 w-3.5 mr-1.5" />Save</>
+                        ) : (
+                          <><Edit2 className="h-3.5 w-3.5 mr-1.5" />Edit</>
+                        )}
+                      </Button>
+                    )}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      onChange={handleFileChange}
+                      disabled={uploading}
+                      accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx"
+                      className="hidden"
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading}
+                      className="h-7 text-xs"
+                    >
+                      {uploading ? (
+                        <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Uploading...</>
+                      ) : (
+                        <><Paperclip className="h-3.5 w-3.5 mr-1.5" />Attach file</>
+                      )}
+                    </Button>
+                  </div>
                 </div>
+                {editingDescription ? (
+                  <div className="space-y-2">
+                    <Textarea
+                      value={editedDescription}
+                      onChange={(e) => setEditedDescription(e.target.value)}
+                      className="min-h-32 text-sm"
+                      placeholder="Enter description..."
+                    />
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setEditingDescription(false)
+                          setEditedDescription(ticket.description ?? "")
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                      <Button size="sm" onClick={updateDescription}>
+                        Save Changes
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="prose prose-sm max-w-none text-sm text-foreground whitespace-pre-wrap">
+                    {ticket.description}
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
 
-          {/* Attachments */}
-          {ticket.attachments.length > 0 && (
-            <Card className="shadow-none">
+          {/* File Preview */}
+          {preview && (
+            <Card className="shadow-none border-blue-200 bg-blue-50">
               <CardContent className="p-4">
-                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                  <Paperclip className="h-4 w-4" />
-                  Attachments ({ticket.attachments.length})
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  {ticket.attachments.map((a) => (
-                    <a
-                      key={a.id}
-                      href={a.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs hover:bg-muted transition-colors"
-                    >
-                      <Paperclip className="h-3 w-3" />
-                      {a.name}
-                    </a>
-                  ))}
+                <div className="flex items-start justify-between mb-3">
+                  <h3 className="text-sm font-semibold">Preview</h3>
+                  <button
+                    onClick={() => setPreview(null)}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    <strong>File:</strong> {preview.name}
+                  </p>
+                  {isImageFile(preview.type) && (
+                    <div className="mt-3">
+                      <img
+                        src={preview.data}
+                        alt={preview.name}
+                        className="max-h-64 max-w-full rounded-md border"
+                      />
+                    </div>
+                  )}
+                  {isPdf(preview.type) && (
+                    <div className="mt-3 p-4 bg-gray-100 rounded-md flex items-center gap-2">
+                      <Paperclip className="h-5 w-5 text-red-500" />
+                      <span className="text-sm text-muted-foreground">PDF Document</span>
+                    </div>
+                  )}
+                  {!isImageFile(preview.type) && !isPdf(preview.type) && (
+                    <div className="mt-3 p-4 bg-gray-100 rounded-md flex items-center gap-2">
+                      <Paperclip className="h-5 w-5 text-blue-500" />
+                      <span className="text-sm text-muted-foreground">Document</span>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -338,6 +629,28 @@ export function TicketDetailClient({ ticket, projectMembers, isWatching, current
                 </div>
               )}
 
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-1.5">Estimated hours</p>
+                <div className="relative">
+                  <Clock className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={estimatedHours}
+                    onChange={(e) => setEstimatedHours(e.target.valueAsNumber || 0)}
+                    onBlur={updateEstimatedHours}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.currentTarget.blur()
+                      }
+                    }}
+                    className="h-8 pl-8"
+                    aria-label="Estimated hours"
+                  />
+                </div>
+              </div>
+
               {/* Labels */}
               {ticket.labels.length > 0 && (
                 <div>
@@ -372,6 +685,31 @@ export function TicketDetailClient({ ticket, projectMembers, isWatching, current
                   </Button>
                 </div>
               </div>
+
+              {attachments.length > 0 && (
+                <>
+                  <Separator />
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-2">Attachments</p>
+                    <div className="space-y-1.5">
+                      {attachments.map((a) => (
+                        <a
+                          key={a.id}
+                          href={a.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 p-2 rounded-md border text-xs hover:bg-muted transition-colors group"
+                        >
+                          <Paperclip className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                          <span className="text-foreground group-hover:underline flex-1 truncate">
+                            {a.name}
+                          </span>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>

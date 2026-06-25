@@ -120,6 +120,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (body.title !== undefined) updates.title = body.title
     if (body.description !== undefined) updates.description = body.description
     if (body.dueDate !== undefined) updates.dueDate = body.dueDate ? new Date(body.dueDate) : null
+    if (body.estimatedHours !== undefined) {
+      const estimatedHours = Number(body.estimatedHours)
+      updates.estimatedHours = Number.isFinite(estimatedHours) ? Math.max(0, Math.floor(estimatedHours)) : 0
+    }
     if (body.labels !== undefined) updates.labels = body.labels
 
     const ticket = await prisma.ticket.update({ where: { id: params.id }, data: updates })

@@ -204,21 +204,22 @@ model SprintItem {
 // ─── Tickets ─────────────────────────────────────────────────────────────────
 
 model Ticket {
-  id          String       @id @default(cuid())
-  ticketKey   String       @unique // e.g. PAY-42
-  title       String
-  description String?      @db.Text
-  type        TicketType   @default(TASK)
-  status      TicketStatus @default(OPEN)
-  priority    Priority     @default(MEDIUM)
-  projectId   String
-  assigneeId  String?
-  reporterId  String
-  dueDate     DateTime?
-  labels      String[]     @default([])
-  order       Int          @default(0)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id              String       @id @default(cuid())
+  ticketKey       String       @unique // e.g. PAY-42
+  title           String
+  description     String?      @db.Text
+  type            TicketType   @default(TASK)
+  status          TicketStatus @default(OPEN)
+  priority        Priority     @default(MEDIUM)
+  projectId       String
+  assigneeId      String?
+  reporterId      String
+  dueDate         DateTime?
+  estimatedHours  Int?         @default(0)
+  labels          String[]     @default([])
+  order           Int          @default(0)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 
   project      Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
   assignee     User?           @relation("TicketAssignee", fields: [assigneeId], references: [id])

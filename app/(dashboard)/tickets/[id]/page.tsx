@@ -61,6 +61,7 @@ export default async function TicketDetailPage({ params }: { params: { id: strin
       projectMembers={allUsers}
       isWatching={isWatching}
       currentUserId={userId}
+      userRole={session?.user?.role as string | undefined}
     />
   )
 }
