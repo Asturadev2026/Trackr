@@ -56,6 +56,7 @@ export type TicketWithRelations = Ticket & {
 }
 
 export type TicketDetail = Ticket & {
+  estimatedHours?: number | null
   project: Pick<Project, "id" | "name">
   assignee: Pick<User, "id" | "name" | "image" | "email"> | null
   reporter: Pick<User, "id" | "name" | "image" | "email">

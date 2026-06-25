@@ -1,11 +1,14 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { ChevronLeft, ChevronRight, Pencil, X, Check, Upload } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
+import { Textarea } from "@/components/ui/textarea"
+import { ExcelImportDialog } from "@/components/tracker/excel-import-dialog"
 import { cn } from "@/lib/utils"
 
 interface WeekDay {
@@ -23,12 +26,53 @@ interface Props {
   weekStart: string
   byProject: { name: string; hours: number }[]
   totalHours: number
+  weeklyGoal: string | null
 }
 
 const TARGET_HOURS = 40
 
-export function WeeklyTrackerClient({ weekDays, weekStart, byProject, totalHours }: Props) {
+export function WeeklyTrackerClient({ weekDays, weekStart, byProject, totalHours, weeklyGoal }: Props) {
   const router = useRouter()
+  const [goal, setGoal] = useState(weeklyGoal ?? "")
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState("")
+  const [saving, setSaving] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
+
+  const startEdit = () => {
+    setDraft(goal)
+    setEditing(true)
+  }
+
+  const cancelEdit = () => setEditing(false)
+
+  const saveGoal = async () => {
+    setSaving(true)
+    try {
+      const res = await fetch("/api/tracker/weekly-goal", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ weekStart, goal: draft }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setGoal(data.goal ?? "")
+      }
+    } finally {
+      setSaving(false)
+      setEditing(false)
+    }
+  }
+
+  const onImportSuccess = async () => {
+    setImportOpen(false)
+    const res = await fetch(`/api/tracker/weekly-goal?weekStart=${weekStart}`)
+    if (res.ok) {
+      const data = await res.json()
+      setGoal(data.goal ?? "")
+    }
+    router.refresh()
+  }
 
   const navigateWeek = (dir: -1 | 1) => {
     const d = new Date(weekStart + "T00:00:00Z")
@@ -52,6 +96,10 @@ export function WeeklyTrackerClient({ weekDays, weekStart, byProject, totalHours
           <Button variant="secondary" size="sm" className="h-8">Weekly</Button>
           <Button variant="outline"   size="sm" className="h-8" onClick={() => router.push("/my-tracker/calendar")}>Calendar</Button>
         </div>
+        <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={() => setImportOpen(true)}>
+          <Upload className="h-3.5 w-3.5" />
+          Import Excel
+        </Button>
       </div>
 
       {/* Week nav */}
@@ -70,6 +118,70 @@ export function WeeklyTrackerClient({ weekDays, weekStart, byProject, totalHours
           {" / "}{TARGET_HOURS} expected
         </div>
       </div>
+
+      {/* Weekly Goal */}
+      <Card className="shadow-none border-dashed">
+        <CardContent className="p-4">
+          <div className="flex items-start gap-3">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
+                Weekly Goal
+              </p>
+              {editing ? (
+                <Textarea
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  placeholder="What do you want to achieve this week?"
+                  className="text-sm resize-none min-h-[72px]"
+                  autoFocus
+                />
+              ) : (
+                <p className="text-sm leading-relaxed">
+                  {goal ? (
+                    goal
+                  ) : (
+                    <span className="text-muted-foreground italic">No goal set for this week.</span>
+                  )}
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-1 shrink-0 mt-0.5">
+              {editing ? (
+                <>
+                  <Button
+                    size="sm"
+                    className="h-7 px-3 text-xs"
+                    onClick={saveGoal}
+                    disabled={saving}
+                  >
+                    <Check className="h-3 w-3 mr-1" />
+                    Save
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2"
+                    onClick={cancelEdit}
+                    disabled={saving}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={startEdit}
+                  title="Edit weekly goal"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Day columns */}
       <div className="grid grid-cols-5 gap-2 items-start">
@@ -158,6 +270,12 @@ export function WeeklyTrackerClient({ weekDays, weekStart, byProject, totalHours
           </CardContent>
         </Card>
       </div>
+
+      <ExcelImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onSuccess={onImportSuccess}
+      />
     </div>
   )
 }
