@@ -55,6 +55,9 @@ export function ExcelImportDialog({ open, onOpenChange, onSuccess }: Props) {
   const [sheets, setSheets] = useState<SheetResult[]>([])
   const [loading, setLoading] = useState(false)
   const [importResult, setImportResult] = useState<{ imported: number } | null>(null)
+  // ★ ADDED — holds the faithful (full-column) copy returned by parse-excel,
+  //   which we send to /api/tracker/import-faithful so Export can be exact.
+  const [faithful, setFaithful] = useState<any>(null)
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0]
@@ -73,7 +76,10 @@ export function ExcelImportDialog({ open, onOpenChange, onSuccess }: Props) {
         throw new Error((err as { error?: string }).error ?? "Failed to parse file")
       }
 
-      const { sheets: parsed } = await res.json() as { sheets: SheetResult[] }
+      // ★ CHANGED — capture both `sheets` (UI review) and `faithful` (exact export).
+      const json = await res.json() as { sheets: SheetResult[]; faithful?: any }
+      const parsed = json.sheets
+      setFaithful(json.faithful ?? null)
 
       if (!parsed || parsed.length === 0) {
         toast.error("No recognisable data found in the file")
@@ -116,6 +122,22 @@ export function ExcelImportDialog({ open, onOpenChange, onSuccess }: Props) {
         const err = await res.json()
         throw new Error((err as { error?: string }).error ?? "Import failed")
       }
+
+      // ★ ADDED — also save the faithful full-column copy used by Export Excel.
+      //   This is what fills WeeklyPlannerRow / DailyPlannerRow so export matches.
+      if (faithful) {
+        const fRes = await fetch("/api/tracker/import-faithful", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(faithful),
+        })
+        if (!fRes.ok) {
+          const err = await fRes.json().catch(() => ({}))
+          console.error("[import-faithful]", err)
+          toast.error((err as { error?: string }).error ?? "Saved for UI, but export copy failed")
+        }
+      }
+
       const result = await res.json() as { imported: number }
       setImportResult(result)
       setStep("done")
@@ -132,6 +154,7 @@ export function ExcelImportDialog({ open, onOpenChange, onSuccess }: Props) {
     setFileName("")
     setSheets([])
     setImportResult(null)
+    setFaithful(null) // ★ ADDED
   }
 
   return (
