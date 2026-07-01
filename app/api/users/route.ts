@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await auth()
+  const session = await authenticate(req)
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   try {
