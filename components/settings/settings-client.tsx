@@ -355,11 +355,17 @@ export function SettingsClient({ user, hasApiKey, appUrl }: Props) {
                     Click below — it downloads a <code className="bg-muted px-1 rounded text-[11px]">.mcp.json</code> file with your key already filled in.
                     Save it anywhere on your computer (Desktop is fine).
                   </p>
-                  <Button size="sm" variant="outline" onClick={downloadMcpJson} disabled={!hasKey}>
+                  <Button size="sm" variant="outline" onClick={downloadMcpJson} disabled={!generatedKey}>
                     <FileJson className="mr-2 h-3.5 w-3.5" />
                     Download .mcp.json
                   </Button>
-                  {!hasKey && <p className="text-xs text-muted-foreground">Generate your API key first (Step 1).</p>}
+                  {!generatedKey && (
+                    <p className="text-xs text-muted-foreground">
+                      {hasKey
+                        ? "Click \"Regenerate key\" above first — the raw key is only available right after generation."
+                        : "Generate your API key first (Step 1)."}
+                    </p>
+                  )}
                 </div>
               </div>
 
