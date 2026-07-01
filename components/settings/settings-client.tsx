@@ -124,6 +124,25 @@ export function SettingsClient({ user, hasApiKey, appUrl }: Props) {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  function downloadMcpJson() {
+    if (!generatedKey && !hasKey) return
+    const content = JSON.stringify({
+      mcpServers: {
+        trackr: {
+          type: "http",
+          url: `${appUrl}/api/mcp`,
+          headers: { Authorization: `Bearer ${generatedKey ?? "YOUR_API_KEY_HERE"}` },
+        },
+      },
+    }, null, 2)
+    const blob = new Blob([content], { type: "application/json" })
+    const a = document.createElement("a")
+    a.href = URL.createObjectURL(blob)
+    a.download = ".mcp.json"
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
+
   const mcpJson = JSON.stringify({
     mcpServers: {
       trackr: {
@@ -330,21 +349,16 @@ export function SettingsClient({ user, hasApiKey, appUrl }: Props) {
               <div className="flex gap-3">
                 <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">2</div>
                 <div className="space-y-2 flex-1">
-                  <p className="text-sm font-medium">Create a <code className="text-xs bg-muted px-1 py-0.5 rounded">.mcp.json</code> file</p>
+                  <p className="text-sm font-medium">Download your config file</p>
                   <p className="text-xs text-muted-foreground">
-                    Create this file in <strong>any folder on your machine</strong> (e.g. your home folder or any project folder).
-                    Replace <code className="bg-muted px-1 rounded text-[11px]">YOUR_API_KEY_HERE</code> with the key you just copied.
+                    Click below — it downloads a <code className="bg-muted px-1 rounded text-[11px]">.mcp.json</code> file with your key already filled in.
+                    Save it anywhere on your computer (Desktop is fine).
                   </p>
-                  <div className="relative">
-                    <pre className="rounded-md bg-muted p-3 text-xs font-mono overflow-x-auto leading-relaxed">{mcpJson}</pre>
-                    <Button
-                      variant="ghost" size="icon"
-                      className="absolute top-2 right-2 h-6 w-6 opacity-60 hover:opacity-100"
-                      onClick={() => copyKey(mcpJson)}
-                    >
-                      {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
-                    </Button>
-                  </div>
+                  <Button size="sm" variant="outline" onClick={downloadMcpJson} disabled={!hasKey}>
+                    <FileJson className="mr-2 h-3.5 w-3.5" />
+                    Download .mcp.json
+                  </Button>
+                  {!hasKey && <p className="text-xs text-muted-foreground">Generate your API key first (Step 1).</p>}
                 </div>
               </div>
 
