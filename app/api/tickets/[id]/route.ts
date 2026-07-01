@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
+import { authenticate } from "@/lib/api-auth"
 import { prisma } from "@/lib/db"
 import { sendMail, ticketAssignedEmail } from "@/lib/mail"
 
-export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
-  const session = await auth()
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+  const session = await authenticate(req)
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   try {
@@ -36,7 +36,7 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await auth()
+  const session = await authenticate(req)
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   try {
@@ -142,8 +142,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
-  const session = await auth()
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const session = await authenticate(req)
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   try {

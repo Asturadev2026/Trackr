@@ -38,3 +38,8 @@ next-env.d.ts
 
 # prisma
 prisma/*.db
+
+# MCP — contains API key secret, never commit
+.mcp.json
+mcp-server/node_modules
+mcp-server/dist

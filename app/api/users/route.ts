@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
+import { authenticate } from "@/lib/api-auth"
 import { prisma } from "@/lib/db"
 import { z } from "zod"
 import bcrypt from "bcryptjs"
@@ -11,8 +11,8 @@ const createSchema = z.object({
   password: z.string().min(8),
 })
 
-export async function GET(_: NextRequest) {
-  const session = await auth()
+export async function GET(req: NextRequest) {
+  const session = await authenticate(req)
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   try {
