@@ -78,6 +78,7 @@ const TOOLS = [
         ticketKey:   { type: "string", description: "e.g. PAY-42 or the ticket's raw ID" },
         status:      { type: "string", enum: ["OPEN", "IN_PROGRESS", "IN_REVIEW", "DONE", "CANCELLED"] },
         priority:    { type: "string", enum: ["LOW", "MEDIUM", "HIGH", "URGENT"] },
+        type:        { type: "string", enum: ["BUG", "FEATURE", "TASK", "IMPROVEMENT", "QUESTION"] },
         assigneeId:  { type: "string", description: "User ID, or empty string to unassign" },
         title:       { type: "string" },
         description: { type: "string" },
@@ -209,6 +210,7 @@ async function callTool(name: string, args: Record<string, unknown>, userId: str
       const data: Record<string, unknown> = {}
       if (updates.status      !== undefined) data.status      = updates.status
       if (updates.priority    !== undefined) data.priority    = updates.priority
+      if (updates.type        !== undefined) data.type        = updates.type
       if (updates.title       !== undefined) data.title       = updates.title
       if (updates.description !== undefined) data.description = updates.description
       if (updates.assigneeId  !== undefined) data.assigneeId  = updates.assigneeId || null

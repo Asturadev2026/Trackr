@@ -197,6 +197,7 @@ server.tool(
     ticketKey:   z.string().describe("Ticket key like PAY-42, or the ticket's raw ID"),
     status:      z.enum(["OPEN", "IN_PROGRESS", "IN_REVIEW", "DONE", "CANCELLED"]).optional(),
     priority:    z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).optional(),
+    type:        z.enum(["BUG", "FEATURE", "TASK", "IMPROVEMENT", "QUESTION"]).optional(),
     assigneeId:  z.string().optional().describe("New assignee user ID, or 'unassign' to remove"),
     title:       z.string().optional(),
     description: z.string().optional(),
