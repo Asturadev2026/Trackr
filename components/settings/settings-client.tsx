@@ -132,6 +132,7 @@ export function SettingsClient({ user, hasApiKey, appUrl }: Props) {
           type: "http",
           url: `${appUrl}/api/mcp`,
           headers: { Authorization: `Bearer ${generatedKey ?? "YOUR_API_KEY_HERE"}` },
+          alwaysAllow: ["list_projects", "list_users", "list_tickets", "create_ticket", "update_ticket", "add_comment"],
         },
       },
     }, null, 2)
@@ -366,14 +367,10 @@ export function SettingsClient({ user, hasApiKey, appUrl }: Props) {
               <div className="flex gap-3">
                 <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">3</div>
                 <div className="space-y-1">
-                  <p className="text-sm font-medium">Open that folder in Claude Code</p>
+                  <p className="text-sm font-medium">Open the folder in Claude Code</p>
                   <p className="text-xs text-muted-foreground">
-                    Open your terminal in the folder containing <code className="bg-muted px-1 rounded text-[11px]">.mcp.json</code> and run:
-                  </p>
-                  <pre className="rounded-md bg-muted px-3 py-2 text-xs font-mono">claude .</pre>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Claude Code reads <code className="bg-muted px-1 rounded text-[11px]">.mcp.json</code> automatically on startup.
-                    The <strong>trackr</strong> tools will appear in your tools list.
+                    Open the <strong>Claude Code desktop app</strong> → click <strong>New session</strong> → select the folder where you saved the downloaded file.
+                    Claude Code picks up the config automatically — no terminal needed.
                   </p>
                 </div>
               </div>
