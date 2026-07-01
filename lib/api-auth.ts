@@ -1,45 +1,40 @@
 /**
  * authenticate() — drop-in replacement for auth() across API routes.
  *
- * How it works:
- *  1. If the request carries  Authorization: Bearer <MCP_API_KEY>  we trust it
- *     and load the user identified by  MCP_API_USER_EMAIL  from the database.
- *     This is the "service account" path used by the MCP server.
- *  2. Otherwise we fall back to the normal NextAuth cookie session — exactly
- *     what happens today for every browser request.
+ * Two paths:
+ *  1. Bearer token  →  SHA-256 hash the token, look up the matching user
+ *                      in the DB via their stored apiKey hash.
+ *                      This is how the remote MCP server (and any API client)
+ *                      authenticates without a browser cookie.
  *
- * Why keep two paths?  The website never sends a Bearer header, so the fallback
- * always fires for real users.  The MCP server never has a cookie, so it always
- * hits path 1.  The two flows never clash.
+ *  2. No Bearer header  →  fall back to the normal NextAuth cookie session,
+ *                          which is what every browser request uses today.
+ *
+ * Security note: we never store the raw key — only its SHA-256 hash.
+ * Hashing the incoming token before the DB lookup means even if the DB is
+ * compromised the attacker can't reverse the hashes back to real keys.
  */
 
 import { NextRequest } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
+import { createHash } from "crypto"
 
 export async function authenticate(req: NextRequest) {
   const authHeader = req.headers.get("authorization")
 
   if (authHeader?.startsWith("Bearer ")) {
-    const token = authHeader.slice(7) // strip "Bearer "
+    const rawToken = authHeader.slice(7)
+    const hashedToken = createHash("sha256").update(rawToken).digest("hex")
 
-    const apiKey   = process.env.MCP_API_KEY
-    const apiEmail = process.env.MCP_API_USER_EMAIL
+    const user = await prisma.user.findUnique({
+      where: { apiKey: hashedToken },
+      select: { id: true, name: true, email: true, role: true },
+    })
 
-    // Both env vars must be set and the token must match
-    if (apiKey && apiEmail && token === apiKey) {
-      const user = await prisma.user.findUnique({
-        where: { email: apiEmail },
-        select: { id: true, name: true, email: true, role: true },
-      })
+    if (user) return { user }
 
-      if (user) {
-        // Return the same shape that auth() returns so callers need no changes
-        return { user }
-      }
-    }
-
-    // A Bearer token was sent but was invalid — reject immediately
+    // Token was provided but didn't match — reject immediately
     return null
   }
 

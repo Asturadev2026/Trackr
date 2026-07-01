@@ -18,6 +18,7 @@ model User {
   password      String?
   role          UserRole  @default(AI_ENGINEER)
   isActive      Boolean   @default(true)
+  apiKey        String?   @unique
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

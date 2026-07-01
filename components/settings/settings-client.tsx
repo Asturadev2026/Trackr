@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { toast } from "sonner"
-import { Loader2 } from "lucide-react"
+import { Loader2, Copy, Check, RefreshCw, Trash2, Bot, Terminal, FileJson, Zap } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -32,12 +32,19 @@ const passwordSchema = z.object({
 
 interface Props {
   user: { id: string; name: string | null; email: string; image: string | null; role: string }
+  hasApiKey: boolean
+  appUrl: string
 }
 
-export function SettingsClient({ user }: Props) {
+export function SettingsClient({ user, hasApiKey, appUrl }: Props) {
   const router = useRouter()
   const [savingProfile, setSavingProfile] = useState(false)
   const [savingPassword, setSavingPassword] = useState(false)
+  const [hasKey, setHasKey] = useState(hasApiKey)
+  const [generatedKey, setGeneratedKey] = useState<string | null>(null)
+  const [generatingKey, setGeneratingKey] = useState(false)
+  const [revokingKey, setRevokingKey] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   const profileForm = useForm({ resolver: zodResolver(profileSchema), defaultValues: { name: user.name ?? "" } })
   const passwordForm = useForm({ resolver: zodResolver(passwordSchema) })
@@ -80,6 +87,53 @@ export function SettingsClient({ user }: Props) {
     }
   }
 
+  async function generateKey() {
+    setGeneratingKey(true)
+    try {
+      const res = await fetch("/api/user/api-key", { method: "POST" })
+      if (!res.ok) throw new Error()
+      const { key } = await res.json()
+      setGeneratedKey(key)
+      setHasKey(true)
+    } catch {
+      toast.error("Failed to generate key")
+    } finally {
+      setGeneratingKey(false)
+    }
+  }
+
+  async function revokeKey() {
+    if (!confirm("Revoke your API key? Any connected Claude sessions will stop working immediately.")) return
+    setRevokingKey(true)
+    try {
+      const res = await fetch("/api/user/api-key", { method: "DELETE" })
+      if (!res.ok) throw new Error()
+      setHasKey(false)
+      setGeneratedKey(null)
+      toast.success("API key revoked")
+    } catch {
+      toast.error("Failed to revoke key")
+    } finally {
+      setRevokingKey(false)
+    }
+  }
+
+  async function copyKey(text: string) {
+    await navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  const mcpJson = JSON.stringify({
+    mcpServers: {
+      trackr: {
+        type: "http",
+        url: `${appUrl}/api/mcp`,
+        headers: { Authorization: "Bearer YOUR_API_KEY_HERE" },
+      },
+    },
+  }, null, 2)
+
   return (
     <div className="space-y-5 animate-fade-in max-w-2xl">
       <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
@@ -89,6 +143,7 @@ export function SettingsClient({ user }: Props) {
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
+          <TabsTrigger value="claude">Claude Integration</TabsTrigger>
         </TabsList>
 
         {/* Profile */}
@@ -194,6 +249,157 @@ export function SettingsClient({ user }: Props) {
             </CardContent>
           </Card>
         </TabsContent>
+        {/* Claude Integration */}
+        <TabsContent value="claude" className="mt-4 space-y-4">
+
+          {/* API Key card */}
+          <Card className="shadow-none">
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Bot className="h-4 w-4" /> API Key
+              </CardTitle>
+              <CardDescription>
+                Your personal key lets Claude act as you in Trackr — create tickets, update tasks, add comments.
+                The raw key is shown only once (we store only a hash, like GitHub tokens).
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {generatedKey ? (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-amber-600 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                    ⚠ Copy this key now — it will not be shown again.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 rounded-md bg-muted px-3 py-2 text-xs font-mono break-all select-all">
+                      {generatedKey}
+                    </code>
+                    <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => copyKey(generatedKey)}>
+                      {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+                    </Button>
+                  </div>
+                </div>
+              ) : hasKey ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
+                  <Check className="h-3.5 w-3.5 text-green-500" />
+                  API key active (value hidden)
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No API key generated yet.</p>
+              )}
+
+              <div className="flex items-center gap-2 pt-1">
+                <Button size="sm" variant={hasKey ? "outline" : "default"} onClick={generateKey} disabled={generatingKey}>
+                  {generatingKey
+                    ? <><Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />Generating…</>
+                    : hasKey
+                    ? <><RefreshCw className="mr-2 h-3.5 w-3.5" />Regenerate key</>
+                    : <><Zap className="mr-2 h-3.5 w-3.5" />Generate API key</>}
+                </Button>
+                {hasKey && (
+                  <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={revokeKey} disabled={revokingKey}>
+                    {revokingKey ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Trash2 className="mr-2 h-3.5 w-3.5" />}
+                    Revoke
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Setup instructions */}
+          <Card className="shadow-none">
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Terminal className="h-4 w-4" /> Connect to Claude Code
+              </CardTitle>
+              <CardDescription>
+                Follow these steps once. No repo cloning or build steps needed.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+
+              {/* Step 1 */}
+              <div className="flex gap-3">
+                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">1</div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Generate your API key above</p>
+                  <p className="text-xs text-muted-foreground">Click "Generate API key" and copy the key shown. It's only visible once.</p>
+                </div>
+              </div>
+
+              {/* Step 2 */}
+              <div className="flex gap-3">
+                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">2</div>
+                <div className="space-y-2 flex-1">
+                  <p className="text-sm font-medium">Create a <code className="text-xs bg-muted px-1 py-0.5 rounded">.mcp.json</code> file</p>
+                  <p className="text-xs text-muted-foreground">
+                    Create this file in <strong>any folder on your machine</strong> (e.g. your home folder or any project folder).
+                    Replace <code className="bg-muted px-1 rounded text-[11px]">YOUR_API_KEY_HERE</code> with the key you just copied.
+                  </p>
+                  <div className="relative">
+                    <pre className="rounded-md bg-muted p-3 text-xs font-mono overflow-x-auto leading-relaxed">{mcpJson}</pre>
+                    <Button
+                      variant="ghost" size="icon"
+                      className="absolute top-2 right-2 h-6 w-6 opacity-60 hover:opacity-100"
+                      onClick={() => copyKey(mcpJson)}
+                    >
+                      {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 3 */}
+              <div className="flex gap-3">
+                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">3</div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Open that folder in Claude Code</p>
+                  <p className="text-xs text-muted-foreground">
+                    Open your terminal in the folder containing <code className="bg-muted px-1 rounded text-[11px]">.mcp.json</code> and run:
+                  </p>
+                  <pre className="rounded-md bg-muted px-3 py-2 text-xs font-mono">claude .</pre>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Claude Code reads <code className="bg-muted px-1 rounded text-[11px]">.mcp.json</code> automatically on startup.
+                    The <strong>trackr</strong> tools will appear in your tools list.
+                  </p>
+                </div>
+              </div>
+
+              {/* Step 4 */}
+              <div className="flex gap-3">
+                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">4</div>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Start using it</p>
+                  <p className="text-xs text-muted-foreground">Try these in Claude Code:</p>
+                  <div className="space-y-1">
+                    {[
+                      "List my projects",
+                      "Show all open URGENT tickets",
+                      'Create a HIGH bug "login redirect loops" in [project name]',
+                      "Move [ticket key] to In Progress and assign to me",
+                      'Add a comment to [ticket key]: "fixed in latest deploy"',
+                    ].map((ex) => (
+                      <div key={ex} className="flex items-start gap-1.5">
+                        <span className="text-muted-foreground text-xs mt-0.5">›</span>
+                        <code className="text-xs text-muted-foreground italic">{ex}</code>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+              <div className="flex items-start gap-2 text-xs text-muted-foreground">
+                <FileJson className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                <p>
+                  The <code className="bg-muted px-1 rounded">.mcp.json</code> file stays on your machine and is never uploaded anywhere.
+                  Do not commit it to git — add it to your <code className="bg-muted px-1 rounded">.gitignore</code>.
+                  Each team member generates their own key; actions happen under their own account.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
       </Tabs>
     </div>
   )
